@@ -37,12 +37,10 @@ Searchis 提供内部金融调研纪要、电话会记录和行业分析的语�
 ## 调用
 
 ```bash
-npx @openduo/searchis query "<研究问题描述>" --json
+npx @openduo/searchis query "<研究问题描述>" --json --timeout 180
 ```
 
 输入是一个自然语言问题，可以是简短的，也可以是带上下文的长描述。Searchis 的内部 agent 会理解问题、拆解成内部搜索策略、检索相关文档、提取原文片段。
-
-调用通常需要 60-300 秒完成（agent 会执行多轮内部搜索）。CLI 使用流式协议持续接收结果，遇到网络或后端真的卡住才会中断（默认 dial 30s、idle 60s），不要额外包装超时。
 
 ## 输出格式
 
@@ -80,7 +78,7 @@ npx @openduo/searchis query "<研究问题描述>" --json
 | `{"error":"not_activated",...}` | 显示激活引导 |
 | `{"error":"query_failed","message":"...401..."}` | 提示 `npx @openduo/searchis refresh` |
 | `{"error":"query_failed","message":"...429..."}` | 等待 30s 重试 |
-| dial / idle timeout（网络或后端卡死） | 报告超时，建议用更精确的查询重试 |
+| 超时 (180s) | 报告超时，建议用更精确的查询重试 |
 
 ## 使用证据时
 
