@@ -1,11 +1,11 @@
 ---
 name: finflow
-description: Query China/HK/US financial market DATA with the finflow CLI. Use for ANY real-time market lookup — a stock quote, K-line/order-book, resolving a company name (茅台/腾讯/NVDA/宁德时代) to its code, listing the member stocks of an industry (A股申万 / 美股 GICS / 港股恒生 — 半导体/白酒/医药…) or a concept (AI/华为/国企改革) or a board (创业板/科创板/沪深/美股/港股/中概股), 龙虎榜 (dragon-tiger abnormal movers), capital flow (主力/北向资金), fundamentals & financial statements, flash news, market sentiment and rankings, macro/economic calendar, futures. Trigger whenever the user names a stock/company/ticker, OR names a sector/industry/concept EVEN WITHOUT the word "板块" (so "半导体怎么样" / "白酒今天如何" count), asks how 大盘 is doing, wants 今日涨跌/异动/龙虎榜/板块排行/北向资金, or any live market number — even when they never say "finflow". When a stock is named without a code, resolve it with `quote search` first. Not for crypto, conceptual/educational finance questions (e.g. 什么是市盈率), investment recommendations, or coding/backtesting tasks.
+description: Query China/HK/US financial market DATA with the finflow CLI. Use for ANY real-time market lookup — a stock quote, K-line/order-book, resolving a company name (茅台/腾讯/NVDA/宁德时代) to its code, listing the member stocks of an industry (A股申万 / 美股 GICS / 港股恒生 — 半导体/白酒/医药…) or a concept (AI/华为/国企改革) or a board (创业板/科创板/沪深/美股/港股/中概股), 龙虎榜 (dragon-tiger abnormal movers), capital flow (主力/北向资金), fundamentals & financial statements, flash news, market sentiment and rankings, macro/economic calendar, futures, AND non-equity instruments — spot commodities (现货黄金/白银/原油/铜), forex (美元指数/欧元美元/离岸人民币/美元日元), global indices (标普500/道琼斯/恒生/日经), domestic 期货主力 (铁矿石/螺纹钢/纯碱/沪铜/沪金). For any commodity/forex/index/期货 quote use `price <CODE.EXCHANGE>` (e.g. `price XAUUSD.GOODS DXY.NYF`). Trigger whenever the user names a stock/company/ticker, OR names a sector/industry/concept EVEN WITHOUT the word "板块" (so "半导体怎么样" / "白酒今天如何" count), asks how 大盘 is doing, wants 今日涨跌/异动/盘中板块轮动(sector anchor)/龙虎榜/板块排行/北向资金, or any live market number — even when they never say "finflow". When a stock is named without a code, resolve it with `quote search` first. Not for crypto, conceptual/educational finance questions (e.g. 什么是市盈率), investment recommendations, or coding/backtesting tasks.
 ---
 
 # Finflow — Chinese Financial Data CLI
 
-Finflow (`@openduo/finflow`) aggregates real-time data from four Chinese platforms — CLS (财联社), Jin10 (金十), Xueqiu (雪球), Gelonghui (格隆汇) — with Yahoo Finance as a fallback for markets they don't cover (Japan/Korea/HK/US). Cover A-shares, HK, US stocks, futures, macro & flash news.
+Finflow (`@openduo/finflow`) aggregates real-time data from four Chinese platforms — CLS (财联社), Jin10 (金十), Xueqiu (雪球), Gelonghui (格隆汇) — with Yahoo Finance as a fallback for markets they don't cover (Japan/Korea/HK/US). Cover A-shares, HK, US stocks, futures, commodities, forex, global indices, macro & flash news.
 
 ## Core principles
 
@@ -24,12 +24,12 @@ Almost every market question maps to a single finflow command that pulls the who
 
 | ❌ Wrong instinct | ✅ Right command |
 |---|---|
-| "半导体/白酒/AI 里都有啥股票" → enumerate tickers from memory, quote each | Classify 板块 type (table below), pull it in one go: `quote industry` / `quote sector stocks` / `quote board` |
+| "半导体/白酒/AI 里都有啥股票" → enumerate tickers from memory, quote each | Classify 板块 type (table below), pull it in one go: `quote industry` / `sector stocks` / `quote board` |
 | "大盘怎么样 / 上证多少点" → guess `sh000001` and `quote` it | `market` returns all major indices + 沪深 capital flow directly (use `market index` for indices only) |
-| "AI / 华为 / 国企改革 概念股" → `quote industry` (industries, not themes) | Concepts are themes, not industries: reverse-lookup the cls plate code via `quote sector plate <一只已知成分股>` → `quote sector stocks <码>`（`sector rank -t concept` 只列**当日热门**概念，通常不含你要的那个） |
+| "AI / 华为 / 国企改革 概念股" → `quote industry` (industries, not themes) | Concepts are themes, not industries: reverse-lookup the cls plate code via `sector plate <一只已知成分股>` → `sector <码>`（`sector rank -t concept` 只列**当日热门**概念，通常不含你要的那个） |
 | Turn a name "茅台" into a code via `info search` (that searches news) | Name→code uses `quote search`; news/article search uses `info search` |
 | Want "latest fundamentals" → `quote finance` (multi-period statements, not a fresh snapshot) | Latest single-period snapshot (PE/PB/ROE/市值) → `quote f10 indicator`; multi-period reports → `quote finance -t …` |
-| A stock spiked, want its **same-industry** peers → `quote related <code>` (one cmd) | Same-**concept-plate** members → `sector plate <code>` then `sector stocks <plate>` (two steps) |
+| A stock spiked, want its **same-industry** peers → `quote related <code>` (one cmd) | Same-**concept-plate** members → `sector plate <code>` then `sector <plate>` (one step via smart default) |
 | "北向资金 / 主力资金流" → `quote flow <某只股票>` (that's per-stock) | Market north/south capital → `quote flow market` (or `market flow`); per-stock main fund → `quote flow <code>` |
 
 ### "板块 / 行业 / 概念 / 市场" — four meanings, four commands
@@ -38,11 +38,11 @@ Chinese "板块" is overloaded. The single word that causes the most misuse. Mat
 
 | 用户说的词 | 实际含义 | 怎么判断 | 命令 |
 |---|---|---|---|
-| **行业**: 半导体 / 白酒 / 医药 / 银行 / 证券 / 新能源车 / 钢铁 | 申万 / GICS / 恒生 **标准行业** | 一个真实的业务部门，有官方分类体系 | 成分股: `quote industry <ind_code> --market cn\|us\|hk`<br>整体排行: `quote sector rank -t industry` |
-| **概念 / 题材**: AI / 华为 / 国企改革 / 元宇宙 / 碳中和 / 网红经济 | 财联社 **概念板块** | 一个跨行业的主题叙事 | 找码: `quote sector plate <已知成分股>` 反查 cls 码（`sector rank -t concept` 只有当日热门，不全）→ 成分股: `quote sector stocks <plate_code>` |
+| **行业**: 半导体 / 白酒 / 医药 / 银行 / 证券 / 新能源车 / 钢铁 | 申万 / GICS / 恒生 **标准行业** | 一个真实的业务部门，有官方分类体系 | 成分股: `quote industry <ind_code> --market cn\|us\|hk`<br>整体排行: `sector rank -t industry` |
+| **概念 / 题材**: AI / 华为 / 国企改革 / 元宇宙 / 碳中和 / 网红经济 | 财联社 **概念板块** | 一个跨行业的主题叙事 | 找码: `sector plate <已知成分股>` 反查 cls 码（`sector rank -t concept` 只有当日热门，不全）→ 成分股: `sector <plate_code>` |
 | **上市板 / 市场**: 创业板 / 科创板 / 沪市主板 / 深市主板 / 北交所 / 新三板 / 美股 / 港股 / 中概股 | **市场板块** | 按上市地划分的交易板 | `quote board <type>`（`cyb`/`kcb`/`us`/`hk`…） |
 
-> 拿不准是行业还是概念？**先试 `quote industry`**（申万覆盖了绝大多数真实行业）；如果明显是一个题材叙事/政策主题，就走概念。想看"整个板块今天涨跌排第几"用 `quote sector rank`。**永远不要因为分不清就退回去凭记忆列股票**——直接拉，拉不到再换下一种。
+> 拿不准是行业还是概念？**先试 `quote industry`**（申万覆盖了绝大多数真实行业）；如果明显是一个题材叙事/政策主题，就走概念。想看"整个板块今天涨跌排第几"用 `sector rank`。**永远不要因为分不清就退回去凭记忆列股票**——直接拉，拉不到再换下一种。
 
 ## Intent → command (pick by what the user wants)
 
@@ -61,11 +61,12 @@ Chinese "板块" is overloaded. The single word that causes the most misuse. Mat
 | 用户想要 | 命令 |
 |---|---|
 | 某行业成分股（半导体/医药…，A/US/HK） | `quote industry <ind_code> --market cn\|us\|hk`（先 `quote industry --market <m>` 列全部行业找码） |
-| 某概念/题材成分股（下钻） | 反查码: `quote sector plate <已知成分股>`（`rank -t concept` 只有当日热门）→ `quote sector stocks <plate_code>` |
+| 某概念/题材成分股（下钻） | 反查码: `sector plate <已知成分股>`（`rank -t concept` 只有当日热门）→ `sector <plate_code>`（智能默认直接出成分股） |
 | 某上市板/市场股票排行（创业板/科创板/沪深/美股/港股/中概股） | `quote board <type>` |
-| 板块（行业/概念）涨跌排行 | `quote sector rank -t industry\|concept` |
+| 板块（行业/概念）涨跌排行 | `sector rank -t industry\|concept` |
+| **今日盘中板块/个股异动**（板块轮动全景） | `sector anchor [date]`（板块项 cls* 码 → `sector <code>` 下钻成分股） |
 | **某股异动 → 找同行业联动股**（最常用） | `quote related <code>`（同行业 peer，一条命令） |
-| 某股异动 → 找**同概念板块**成员 | `sector plate <code>` → `sector stocks <plate>`（两步） |
+| 某股异动 → 找**同概念板块**成员 | `sector plate <code>` → `sector <plate>`（一步下钻） |
 
 ### C. Fundamentals & statements (基本面/财报) — `f10` ≠ `finance`
 
@@ -83,12 +84,11 @@ Chinese "板块" is overloaded. The single word that causes the most misuse. Mat
 | 主要指数 + 沪深资金（默认大盘总览） | `market` |
 | 纯大盘指数 | `market index` |
 | 市场情绪（涨停/跌停/封板率/涨跌分布） | `market emotion` |
-| 全市场排行（涨跌幅/成交量/成交额/换手率/振幅） | `market rank [type]` |
 | 港股排行 | `market hk [sort]` |
-| 今天哪些股票异动 / 龙虎榜（带上榜原因） | `market longhu [date]` |
+| 官方当日龙虎榜（带上榜原因） | `market longhu [date]` |
 | 全球央行利率 | `market rates` |
 
-> 三种"异动/排行"别混：官方当日异常 = `market longhu`；当日涨幅榜 = `market rank change`；某股的同**行业**联动 = `quote related`（同**概念板块**成员用 `sector plate` → `sector stocks`）。
+> 两种"异动"别混：盘中实时板块轮动/拉升跳水时间轴 = `sector anchor`（板块项的 cls 码直接 `sector <code>` 下钻成分股）；官方收盘后龙虎榜（异常波动上榜） = `market longhu`。某股异动后想找同**行业**联动股用 `quote related`（同**概念板块**成员用 `sector plate` → `sector <plate>`）。
 
 ### E. Capital flow (资金面) — per-stock vs market-wide
 
@@ -115,9 +115,10 @@ Chinese "板块" is overloaded. The single word that causes the most misuse. Mat
 |---|---|
 | 宏观数据 / 大事 / 全球假期 | `calendar macro\|event\|holiday [date]` |
 | A股 / 港股 / 美股 数据日历 | `calendar ashare\|hk\|us [date]` |
-| A股投资日历 | `calendar invest [date]` |
 | 期货快讯 / 头条 | `future`（`-c <频道>` 按品种；`future headline`） |
 | 期现基差 | `future basis [date]`（`-g <板块>`） |
+| **期货/商品/外汇/指数 实时报价**（黄金/原油/铁矿石/螺纹钢/美元指数/标普/恒指/离岸人民币…） | `price [codes...]`（`CODE.EXCHANGE` 代码，空格分隔；省略=默认看盘列表）。详见 `price` |
+| **期货/商品/外汇/指数 K 线历史**（XAUUSD/i9888/SPX 的日/周/月/分钟线） | `price kline <code> -p <period> -n <num>`（tm-qtg+OSS；分钟线近实时，日线最新 1–2 根可能未落盘）。详见 `price kline` |
 
 ## Global options
 
@@ -143,7 +144,7 @@ Each hit is `{code, name, type}`. **`type` is always `"stock"` — don't filter 
 A name that is also listed in HK/US returns all of them at once (e.g. `比亚迪` → `SZ002594` A, `01211` H, `BYDDY` US ADR) — pick by prefix.
 
 Two boundaries to expect:
-- **Concept/industry words return plates, indices, and ETFs — not a member-stock list.** `quote search 半导体` gives you `BK0021 半导体` and SOXX/SOXL, not the constituent stocks. For *industry → its stocks*, use `quote industry <ind_code>`; for *concept → its members*, use `quote sector stocks <plate_code>`.
+- **Concept/industry words return plates, indices, and ETFs — not a member-stock list.** `quote search 半导体` gives you `BK0021 半导体` and SOXX/SOXL, not the constituent stocks. For *industry → its stocks*, use `quote industry <ind_code>`; for *concept → its members*, use `sector <plate_code>`.
 - **Search matches the official security name (substring/prefix), not slang.** `茅台` works (it's a substring of 贵州茅台); pure market slang like `宁王` returns nothing — normalize it to the official name/短称 before searching.
 
 ## Command Reference (detailed syntax)
@@ -222,18 +223,19 @@ Minute periods (`1m`…`120m`) auto-use xueqiu; daily+ default to cls. US/HK →
 
 **`quote depth <code>`** — 5-level order book. **`quote ticks <code>`** — tick trades. **`quote timeline <code>`** — intraday line. All take `--src cls|xq` (US/HK → `xq`).
 
-**`quote sector`** — CLS plate data.
+**`sector`** — the whole plate/concept workflow in one command group (CLS).
 
 | Subcommand | Args | Options | Description |
 |---|---|---|---|
+| `sector` | `[code]` | — | **Smart default**: `cls*` code → its member stocks; stock code → its plates; no code → industry plate ranking. |
+| `sector anchor [date]` | date | — | **Intraday movers timeline** — plates (`cls*`) & stocks that spiked up/down, time-ordered. The whole-day plate-rotation picture. |
 | `sector rank` | — | `-t <type>` (default `industry`) | Plate ranking. Type: `industry` `concept`. Each plate has a `code`. |
 | `sector plate <code>` | code | — | A stock's plates (each with `code`). |
 | `sector stocks <plate_code>` | plate_code | `--way change\|last_px` | Members of one plate/concept — the drill-down (each with `reason`, `isCore`). |
-| `sector industry <code>` | code | — | Industry info (xueqiu F10). |
 
-`plate_code` (cls plate id, e.g. `cls80405`=华为产业链) — get it by **reverse-lookup**: `quote sector plate <stock>` where <stock> is ANY stock you know is in the concept (e.g. 润和软件 `sz300339` → 华为产业链 `cls80405`); the result lists that stock's plates, each with a `code`. Then `quote sector stocks <plate_code>`. For same-**industry** peers use `quote related` instead. (`sector rank -t concept` only lists today's ~6 **hot** concepts — don't rely on it to find a specific concept's code.)
+The workflow: **`sector anchor`** (今日哪些板块异动) → grab a plate's `cls*` code → **`sector <code>`** (一键下钻成分股) → `quote <stock>` (挑个股). Or bottom-up: **`sector plate <stock>`** (个股属于哪些板块) → **`sector <plate>`** (同板块兄弟股).
 
-Default (no subcommand): with code → `plate`, without → `rank -t industry`.
+`plate_code` (cls plate id, e.g. `cls80405`=华为产业链) — get it by **reverse-lookup**: `sector plate <stock>` where <stock> is ANY stock you know is in the concept (e.g. 润和软件 `sz300339` → 华为产业链 `cls80405`); the result lists that stock's plates, each with a `code`. Then `sector <plate_code>`. For same-**industry** peers use `quote related` instead; for a stock's industry profile (F10) use `quote industry-profile <code>`. (`sector rank -t concept` only lists today's ~6 **hot** concepts — don't rely on it to find a specific concept's code.)
 
 ### `quote flow` — capital flow
 
@@ -323,7 +325,6 @@ CLS categories: `all` `red` `announcement` `watch` `hk_us` `fund` `remind`. GLH 
 |---|---|---|---|
 | (default) | — | glh | Major indices + Shanghai/Shenzhen capital flow |
 | `market emotion` | — | cls | Sentiment: limit-up/down, seal rate, turnover, distribution |
-| `market rank [type]` | `change` `volume` `amount` `turnover` `amplitude` (default `change`) | cls | Stock ranking |
 | `market index` | — | glh | Major indices only |
 | `market hk [sort]` | `netChange` `turnoverValue` `turnVolume` (default `netChange`). `-o asc\|desc` (default `desc`) | glh | HK ranking |
 | `market flow` | — | glh | Northbound/southbound capital |
@@ -336,7 +337,6 @@ All accept optional `<date>` (default today, `YYYY-MM-DD`).
 
 | Subcommand | Source | Description |
 |---|---|---|
-| `calendar invest [date]` | cls | A-share investment calendar |
 | `calendar macro [date]` | jin10 | Global macro data releases |
 | `calendar event [date]` | jin10 | Macro events (speeches, decisions) |
 | `calendar holiday [date]` | jin10 | Global holidays |
@@ -346,7 +346,7 @@ All accept optional `<date>` (default today, `YYYY-MM-DD`).
 | `calendar future-event [date]` | jin10 | Futures calendar events |
 | `calendar future-holiday [date]` | jin10 | Futures calendar holidays |
 
-Default (no subcommand) → `calendar invest` today.
+Default (no subcommand) → `calendar macro` today.
 
 ### `future` — futures
 
@@ -361,6 +361,76 @@ Top-level `--channel`/`-c` applies to all: `all`(默认) `oil` `steel` `coal` `g
 | `future event [date]` | Futures calendar events |
 | `future holiday [date]` | Futures calendar holidays |
 
+### `price` — real-time futures / commodity / forex / index quotes
+
+Live price snapshots (source: `jin10 market-ws`, ~2–3s push, no auth) for the instruments the A/HK/US **stock** commands don't cover: domestic futures, spot commodities, forex, global indices. This is the counterpart to `quote` (stocks) — use `price` for any `CODE.EXCHANGE`-form symbol.
+
+```
+price XAUUSD.GOODS i9888.DCE DXY.NYF    # CODE.EXCHANGE codes, space-separated
+price                                    # default watchlist (12 mainstream instruments)
+```
+
+Each item: `{code, price, change, changePercent, open, high, low, preclose, openInterest, turnover, timestamp}`. `changePercent` is a percentage number (show with `%`); `preclose` = 昨结算 (domestic futures) or 昨收 (international) — the change reference. Codes are passed through **verbatim (case-preserving)** — both market-ws and the OSS K-line path are case-sensitive (`i9888.DCE` ≠ `I9888.DCE`); use the exact case from the table or symbolist.
+
+**`quote` vs `price`:** `quote` = securities with stock codes (`SH600519` / `00700` / `AAPL`); `price` = everything market-ws streams, codes contain a `.` exchange suffix (`XAUUSD.GOODS` / `i9888.DCE` / `DXY.NYF` / `SPX.INDEX`).
+
+**Constructing codes — lookup the product code, then apply the rule.** Only 主力合约 (`888`/`9888`), 连续合约 (`c1`), and active 现货/外汇/指数 stream live.
+
+**国内期货主力** — 主力码 = 产品码 + 后缀，**总长固定 5**：1 字母产品码加 `9888`，2 字母产品码加 `888`。查下表得产品码 → 拼接 → 加交易所后缀（`.DCE`/`.SHF`/`.CZC`/`.INE`/`.CF`/`.GFEX`）。例：铁矿石 `i`→`i9888.DCE`；螺纹钢 `rb`→`rb888.SHF`；十年国债 `T`→`T9888.CF`。
+
+| 交易所 | 产品码 = 品种 |
+|---|---|
+| `DCE` 大商所 | i=铁矿石 a=豆一 b=豆二 c=玉米 cs=淀粉 eb=苯乙烯 eg=乙二醇 j=焦炭 jd=鸡蛋 jm=焦煤 l=塑料 lg=原木 lh=生猪 m=豆粕 p=棕榈油 pg=LPG pp=PP rr=粳米 v=PVC y=豆油 bb=胶板 bz=纯苯 fb=纤板 |
+| `SHF` 上期所 | au=沪金 ag=沪银 al=沪铝 cu=沪铜 ni=沪镍 pb=沪铅 sn=沪锡 zn=沪锌 rb=螺纹钢 hc=热卷 wr=线材 ss=不锈钢 bu=沥青 fu=燃油 ru=橡胶 br=丁二烯橡胶 sp=纸浆 ao=氧化铝 ad=铸造铝 |
+| `CZC` 郑商所 | AP=苹果 CF=棉花 CJ=红枣 CY=棉纱 FG=玻璃 MA=甲醇 OI=菜油 PF=短纤 PK=花生 PX=对二甲苯 RM=菜粕 RS=菜籽 SA=纯碱 SF=硅铁 SM=锰硅 SR=白糖 TA=PTA UR=尿素 ZC=动力煤 及 JR/PL/PM/PR/RI/SH/WH 等小品种 |
+| `INE` 上期能源 | sc=原油 fu=燃油 lu=低硫燃油 nr=20号胶 bc=国际铜 ec=集运指数(欧线) |
+| `CF` 中金所 | IF=沪深300 IC=中证500 IH=上证50 IM=中证1000 T=十债(9888) TF=五债 TS=二债 TL=30年国债 |
+| `GFEX` 广期所 | lc=碳酸锂 si=工业硅 ps=多晶硅 pd=钯 pt=铂 |
+
+**具体月份合约**（非主力，按需拼）：国内 = 产品码 + `YYMM`（`i2509`=铁矿石25年09月，`rb2510`，`au2506`）。
+
+**国际期货连续合约** = 产品码 + `c1`，加交易所后缀：
+
+| 交易所 | 产品码 = 品种 (拼 `c1`) |
+|---|---|
+| `CMX` COMEX | GC=黄金 SI=白银 HG=铜 ALI=铝 |
+| `NYM` NYMEX | CL=WTI原油 NG=天然气 PA=钯金 PL=铂金 HRC=热轧钢卷 TIO=铁矿粉 UXX=铀 |
+| `CBT` CBOT | S=大豆 C=玉米 W=小麦 SM=豆粕 BO=豆油 KW=硬麦 O=燕麦 |
+| `SGX` 新交所 | SGXCN=富时A50 SGXNK=日经225 SGXTWN=台湾指数 SGXSCI=铁矿 |
+| `OSA`/`ZHC` | JRU=日本橡胶(OSA) CMA=铝(ZHC) |
+
+例：`GCc1.CMX`(COMEX金) `CLc1.NYM`(WTI油) `SIc1.CMX`(COMEX银) `SGXCNc1.SGX`(A50)。
+
+**现货商品** (`CODE.GOODS`): `XAUUSD`=黄金 `XAGUSD`=白银 `XPDUSD`=钯金 `XPTUSD`=铂金 `USOIL`=WTI原油 `UKOIL`=布伦特 `NGAS`=天然气 `COPPER`=铜 `NGAS`=天然气。
+**外汇** (`CODE.NYF`/`.FXCM`/`.BANK`): 货币对 = 基础+报价货币 — `DXY`=美元指数 `EURUSD` `GBPUSD` `USDJPY` `USDCAD` `AUDUSD` `NZDUSD` `USDCNH`=离岸人民币 `USDCHF`=瑞郎。
+**全球指数** (`CODE.INDEX`): `SPX`=标普500 `DJI`=道琼斯 `NDX`=纳指100 `HSI`=恒生 `N225`=日经225 `KS11`=韩国KOSPI `GDAXI`=德国DAX `FCHI`=法国CAC `000001.SH`=上证综指。
+**上海金/银 T+D** (`CODE.ICBCM`): `Au(T+D)` `Ag(T+D)` `mAu(T+D)` `Au99.99`。
+
+**Querying more symbols:** full DB at `https://app-server.jin10.com/symbolist_hero_0507.txt` (gzip JSON, ~90k, schema `c`/`m`/`n`/`d`/`t`/`r`; subscribe as `c + "." + m`). For codes not in the tables above (小品种, 期权, historical months), fetch it and search by `n` (Chinese name). Non-streaming codes return no snapshot.
+
+#### `price kline` — K-line history for non-equity instruments
+
+Historical candles for the same `CODE.EXCHANGE` symbols `price` covers, via tm-qtg (10006 file list → OSS download). Source: `jin10 tm-qtg`. **No guest token needed** (register with empty token).
+
+```
+price kline XAUUSD.GOODS -p d -n 120      # 现货黄金 日线 120 根
+price kline i9888.DCE -p 5m -n 60         # 铁矿石 5分钟 60 根
+price kline SPX.INDEX -p w -n 52          # 标普500 周线
+```
+
+| Flag | Default | Values |
+|---|---|---|
+| `--period`/`-p` | `d` | `d` `w` `m` `y` `1m` `5m` `10m` `15m` `30m` `60m` `120m` |
+| `--number`/`-n` | `120` | candle count |
+
+Each item: `{date, open, high, low, close, volume}`. `date` is ISO (minute periods keep full timestamp; daily+ keep `yyyy-mm-dd`).
+
+**Limits (2026-06):**
+- **K-line comes from pre-generated gzip files on OSS, not the live WS feed.** Intraday (minute) files update during the session → near-real-time (~last closed bar). Daily/weekly/monthly files are batch-snapshotted → the latest 1–2 bars may not be on OSS yet. For live price use `price <code>`.
+- **Not every symbol has K-line files.** Verified: `XAUUSD.GOODS` (5min+daily), `i9888.DCE` (5min), `SPX.INDEX` (5min). Some (`rb888.SHF`, `DXY.NYF`) return no files. If 0 candles, the symbol likely isn't on OSS — try `price <code>` for a live quote instead.
+- Intraday returns up to ~1000 candles (one file ≈ 3.5 days of 5min); daily/weekly/monthly paginate through all files (few).
+- Symbols are **case-sensitive** (`i9888.DCE`, not `I9888.DCE`).
+
 ## Auth (zero-config)
 
 All commands work with no setup. **Xueqiu** (F10, finance, industry, board, longhu, flow, margin, search) auto-fetches an anonymous session (full /hq cookie set incl. `acw_tc` WAF cookie) on first use, cached at `~/.xueqiu-anon-cookie`; no login needed. **Jin10** (`flash detail`, `flash date`, `topic show`, `calendar macro/event/holiday`) tries a browser cookie and works without it (less data); `flash date` needs login. **CLS** signs every request (no login). **Gelonghui** needs no auth.
@@ -370,8 +440,7 @@ All commands work with no setup. **Xueqiu** (F10, finance, industry, board, long
 - **`meta.source`** = which platform served the data (freshness context). Fallback markers use the space form (`xq fallback`, `yahoo fallback`).
 - **`market emotion`** shows limit-up/down counts, seal rates — key sentiment.
 - **`quote flow market`** / **`market flow`** show northbound (沪港通/深港通) capital — key for A-share trend.
-- **Non-trading hours**: `emotion`, `timeline` return empty; `longhu` empty before close (~17:30).
-- **`market rank` quirks**: `--order`/`--order-by` are NOT supported here (only `quote board`/`industry` support them); the `turnover`/`amplitude` rank types are often empty intraday (populate after close).
+- **Non-trading hours**: `emotion`, `timeline` return empty; `longhu` empty before close (~17:30); `sector anchor` only has data for trading days.
 - **`-n` defaults vary**: most 10; `kline` 120; `industry`/`board` 30; `flow history` uses `-c`.
 - **Xueqiu single-source commands** (`search`/`industry`/`board`/`f10`/`finance`/`flow history`) have **no cls/Yahoo fallback** — if xueqiu's WAF blocks them they error. Only `quote <code>` and `kline`/`depth`/`ticks`/`timeline` have fallback chains.
 - **CLS flash with jin10 source** auto-paginates up to 50 pages (slow for large `-n`).
