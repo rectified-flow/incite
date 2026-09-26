@@ -80,6 +80,7 @@ npx @openduo/searchis query "<研究问题描述>"
 - `context` — 对该证据的一句话摘要
 - `answer` — 服务内部对证据的草稿组织，**仅作参考线索**：可能漏关键证据、可能误读，最终结论由调用方基于 evidences 自行整理
 - `evidences: []` — 未找到相关证据（有效结果，不要伪造）
+- `source.contributor` / `source.ingestedAt` — 仅当证据来自**用户上传**的资料时出现：`contrib-xxxxxxxx` 是上传者的稳定假名，`ingestedAt` 是收录时间（UTC）。`source.publishTimeIso` / `source.publishTimePrecision` 是原文时间及其精度（day/minute/second）。引用这类证据时标注"用户贡献"，与内部调研纪要区分开
 
 ## 错误处理
 
@@ -93,5 +94,44 @@ npx @openduo/searchis query "<研究问题描述>"
 ## 使用证据时
 
 - 引用 `quote` 字段原文，不改写
-- 标注来源 `[内部调研 {title} {date}]`
+- 标注来源 `[内部调研 {title} {date}]`；用户贡献的证据标注 `[用户贡献 {contributor} {title} {date}]`
 - 空结果时如实报告，不伪造
+
+## 上传资料（需要上传权限）
+
+只有被 root 授予上传权限的账号可以上传。上传后资料进入**所有用户共享**的检索库，**只能新增，不能修改或删除**，所以务必先 `--dry-run`。
+
+### 流程
+
+1. 查看字段规范（以服务器返回为准）：`npx @openduo/searchis upload --schema`
+2. 把资料整理成一个 markdown 文件，开头是 YAML frontmatter：
+
+```markdown
+---
+title: "原文标题"
+publish_time: "2026-09-24T23:48:55+08:00"
+original_target: [MongoDB, Snowflake]
+institution: "来源机构"
+author: "作者或专家"
+source_url: "https://…"          # 可选
+---
+正文……
+
+![营收图](figs/revenue.png)
+```
+
+3. 预检：`npx @openduo/searchis upload doc.md --dry-run`，按返回的逐条问题修正，直到通过
+4. 正式上传：`npx @openduo/searchis upload doc.md`
+
+### 必须遵守
+
+- **`publish_time` 是原文时间，必须带时区**：`2026-09-25+08:00`（只到日）、`2026-09-25T08:00+08:00`（到分）、`2026-09-25T08:00:00Z`（到秒）。原文没写时区时，**问你的用户，不要猜**；原文只有日期就只填日期，不要编时刻。收录时间由服务器自动记录。
+- **`original_target` 只列原文实际点名的公司**，不要推测补充；一家都没点名就写 `[]`。
+- **图片只能引用随文件一起的本地图片**（相对 md 文件的路径，文件名只用 `A-Za-z0-9._/-`）；不允许网络图片、`<img>` 标签、图片标题语法。CLI 会自动把引用到的本地图片一起上传。
+- 不要在正文里写 frontmatter 以外的元数据；`contributor` / `ingested_at` 由服务器写入，自己填会被拒绝。
+- 上传失败后重试要复用 stderr 打印的 `--idempotency-key`，避免重复入库（系统不去重）。
+
+### 上传后
+
+- `search` 立即可搜；`hybrid_search` 最多 30 分钟后可搜；wiki 由后台异步吸收。
+- 错误 `stored_not_linked`：已持久化，稍后自动可搜，**不要重传**。
